@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --fm-bg: #FFF9F0;
+    --fm-primary: #BFE8D5;
+    --fm-primary-hover: #A7DECA;
+    --fm-secondary: #FFCBAE;
+    --fm-secondary-hover: #FFB791;
+    --fm-accent: #FFE6A7;
+    --fm-accent-hover: #FCD98B;
+    --fm-purple: #D9D2F5;
+    --fm-purple-hover: #C5BCF0;
+    --fm-text: #46564E;
+    --fm-text-muted: #718096;
+    --fm-border: #E8E2D8;
+    
+    --radius-card: 20px;
+    --radius-button: 14px;
+    --radius-input: 13px;
+    --radius-modal: 22px;
+  }
+
+  body {
+    background-color: var(--fm-bg);
+    color: var(--fm-text);
+    font-family: 'Be Vietnam Pro', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Custom soft pastel utility classes */
+.bg-fm-bg { background-color: #FFF9F0; }
+.bg-fm-primary { background-color: #BFE8D5; }
+.bg-fm-primary-hover:hover { background-color: #A7DECA; }
+.bg-fm-secondary { background-color: #FFCBAE; }
+.bg-fm-secondary-hover:hover { background-color: #FFB791; }
+.bg-fm-accent { background-color: #FFE6A7; }
+.bg-fm-purple { background-color: #D9D2F5; }
+.text-fm-text { color: #46564E; }
+.text-fm-muted { color: #718096; }
+.border-fm-border { border-color: #E8E2D8; }
+
+.rounded-card { border-radius: 20px; }
+.rounded-btn { border-radius: 14px; }
+.rounded-input { border-radius: 13px; }
+.rounded-modal { border-radius: 22px; }
+
+.shadow-soft {
+  box-shadow: 0 4px 20px -2px rgba(70, 86, 78, 0.06), 0 2px 6px -1px rgba(70, 86, 78, 0.04);
+}
+
+.shadow-soft-lg {
+  box-shadow: 0 10px 30px -4px rgba(70, 86, 78, 0.08), 0 4px 10px -2px rgba(70, 86, 78, 0.05);
+}
+
+.shadow-soft-hover:hover {
+  box-shadow: 0 8px 25px -2px rgba(70, 86, 78, 0.1), 0 3px 8px -1px rgba(70, 86, 78, 0.06);
+  transform: translateY(-2px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Leaflet container fixes */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 10;
+  border-radius: 16px;
+}
