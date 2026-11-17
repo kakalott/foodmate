@@ -35,7 +35,7 @@ Trả về đúng định dạng JSON:
 `;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,9 +52,13 @@ Trả về đúng định dạng JSON:
     );
 
     const data: any = await res.json();
+    console.log('Gemini API response raw:', JSON.stringify(data).slice(0, 300));
     const rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!rawJsonText) {
+      if (data?.error) {
+        throw new Error(`Gemini API lỗi (${data.error.code}): ${data.error.message}`);
+      }
       throw new Error('Lỗi kết nối hoặc phản hồi không hợp lệ từ Gemini API.');
     }
 
@@ -84,7 +88,7 @@ LƯU Ý QUAN TRỌNG: Tên món ăn trong mảng 'dishes' PHẢI là tên ngắn
 Trả về định dạng JSON: { "comment": "Câu dạo đầu...", "dishes": ["Tên món 1", "Tên món 2", "Tên món 3"] }`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +139,7 @@ YÊU CẦU:
 Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
