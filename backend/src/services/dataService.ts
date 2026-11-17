@@ -289,8 +289,8 @@ export const dbService = {
   },
 
   // Ưu tiên đọc key từ DB, nếu không có mới fallback sang file .env
-  async getEffectiveApiKey(type: 'gemini' | 'google_maps'): Promise<string | undefined> {
-    const configKey = type === 'gemini' ? 'gemini_api_key' : 'google_maps_key';
+  async getEffectiveApiKey(type: 'gemini' | 'google_maps' | 'trackasia'): Promise<string | undefined> {
+    const configKey = type === 'gemini' ? 'gemini_api_key' : (type === 'trackasia' ? 'trackasia_api_key' : 'google_maps_key');
     const dbVal = await this.getConfig(configKey);
     if (dbVal && dbVal.trim().length > 5 && !dbVal.includes('your_')) {
       return dbVal.trim();
@@ -299,8 +299,11 @@ export const dbService = {
     if (type === 'gemini') {
       const envKey = process.env.GEMINI_API_KEY;
       return envKey && !envKey.includes('your_') ? envKey : undefined;
+    } else if (type === 'trackasia') {
+      const envKey = process.env.TRACKASIA_API_KEY;
+      return envKey && !envKey.includes('your_') ? envKey : undefined;
     } else {
-      const envKey = process.env.GOOGLE_MAPS_KEY || process.env.GOOGLE_PLACES_KEY;
+      const envKey = process.env.GOOGLE_MAPS_KEY || process.env.GOOGLE_PLACES_KEY || process.env.TRACKASIA_API_KEY;
       return envKey && !envKey.includes('your_') ? envKey : undefined;
     }
   },

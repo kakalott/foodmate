@@ -79,7 +79,9 @@ Trả về đúng định dạng JSON:
     }
 
     const weatherDesc = `${weather.temperature}°C, ${weather.description}`;
-    const prompt = `Đóng vai người bạn sành ăn, cực kỳ sáng tạo. Lúc này là ${timeStr}, thời tiết ${weatherDesc}. User không biết ăn gì. Hãy sáng tạo 1 câu dạo đầu tự nhiên và nghĩ ra chính xác 3 món ăn khác biệt hoàn toàn (đừng gò bó món truyền thống) cực kỳ phù hợp lúc này. Đừng lặp lại các đề xuất cũ. Trả về định dạng JSON: { "comment": "Câu dạo đầu...", "dishes": ["Món A", "Món B", "Món C"] }`;
+    const prompt = `Đóng vai người bạn sành ăn, cực kỳ sáng tạo. Lúc này là ${timeStr}, thời tiết ${weatherDesc}. User không biết ăn gì. Hãy sáng tạo 1 câu dạo đầu ngắn gọn, vui vẻ và nghĩ ra chính xác 3 loại món ăn khác biệt hoàn toàn (ví dụ: một món nước, một món khô/cơm, một món ăn vặt hoặc ẩm thực quốc tế) cực kỳ phù hợp lúc này.
+LƯU Ý QUAN TRỌNG: Tên món ăn trong mảng 'dishes' PHẢI là tên ngắn gọn (dưới 4 từ tiếng Việt, ví dụ: "Bún ốc sườn", "Cơm rang dưa bò", "Bánh tráng nướng") để hệ thống bản đồ định vị chính xác quán ăn xung quanh.
+Trả về định dạng JSON: { "comment": "Câu dạo đầu...", "dishes": ["Tên món 1", "Tên món 2", "Tên món 3"] }`;
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,

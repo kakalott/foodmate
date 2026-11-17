@@ -9,13 +9,16 @@ router.get('/', async (_req: Request, res: Response) => {
     const configs = await dbService.getAllConfigs();
     const googleKey = configs['google_maps_key'] || process.env.GOOGLE_MAPS_KEY || '';
     const geminiKey = configs['gemini_api_key'] || process.env.GEMINI_API_KEY || '';
+    const trackasiaKey = configs['trackasia_api_key'] || process.env.TRACKASIA_API_KEY || '';
 
     res.json({
       data: {
         google_maps_key: googleKey,
         gemini_api_key: geminiKey,
+        trackasia_api_key: trackasiaKey,
         has_google_key: !!googleKey && !googleKey.includes('your_'),
         has_gemini_key: !!geminiKey && !geminiKey.includes('your_'),
+        has_trackasia_key: !!trackasiaKey && !trackasiaKey.includes('your_'),
       },
     });
   } catch (error: any) {
@@ -26,7 +29,7 @@ router.get('/', async (_req: Request, res: Response) => {
 // POST /api/config - Cập nhật API Keys vào Database
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { google_maps_key, gemini_api_key } = req.body;
+    const { google_maps_key, gemini_api_key, trackasia_api_key } = req.body;
 
     if (typeof google_maps_key === 'string') {
       await dbService.setConfig('google_maps_key', google_maps_key.trim());
@@ -34,6 +37,10 @@ router.post('/', async (req: Request, res: Response) => {
 
     if (typeof gemini_api_key === 'string') {
       await dbService.setConfig('gemini_api_key', gemini_api_key.trim());
+    }
+
+    if (typeof trackasia_api_key === 'string') {
+      await dbService.setConfig('trackasia_api_key', trackasia_api_key.trim());
     }
 
     res.json({
