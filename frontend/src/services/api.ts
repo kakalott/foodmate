@@ -14,12 +14,12 @@ import type {
   RestaurantReport,
 } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-// Gắn cứng trực tiếp đường link Google Apps Script Web App (không phụ thuộc vào .env khi build trên GitHub Actions)
-export const GAS_URL = 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
-
 export const isLocalhost = typeof window !== 'undefined' && 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const API_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:3001' : '');
+// Gắn cứng trực tiếp đường link Google Apps Script Web App (không phụ thuộc vào .env khi build trên GitHub Actions)
+export const GAS_URL = 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
