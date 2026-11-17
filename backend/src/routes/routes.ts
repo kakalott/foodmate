@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { routingService } from '../services/routingService';
 import { dbService } from '../services/dataService';
+import { logToGoogleSheets } from '../services/sheetsService';
 
 const router = Router();
 
@@ -59,6 +60,18 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const route = await routingService.calculateAndLogRoute(req.body);
     res.json({ data: route });
+
+    // Bắn log ngầm sang Google Sheets (Route_Logs)
+    logToGoogleSheets('Route_Logs', {
+      session_id: route?.session_id || req.body?.session_id || 'unknown',
+      origin_lat: route?.origin_lat || req.body?.origin_lat,
+      origin_lng: route?.origin_lng || req.body?.origin_lng,
+      dest_lat: route?.dest_lat || req.body?.dest_lat || req.body?.destination_lat,
+      dest_lng: route?.dest_lng || req.body?.dest_lng || req.body?.destination_lng,
+      restaurant_name: route?.restaurant_name || req.body?.restaurant_name || 'Quán ăn',
+      distance_meters: route?.distance_meters,
+      duration_seconds: route?.duration_seconds,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Lỗi khi tính toán và ghi nhận tuyến đường' });
   }
