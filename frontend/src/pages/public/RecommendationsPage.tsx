@@ -282,7 +282,7 @@ export const RecommendationsPage: React.FC = () => {
       {/* Error state */}
       {error && (
         <ErrorState
-          message="Không thể lấy danh sách quán lúc này. Bạn thử lại nhé!"
+          message="Không có kết nối mạng hoặc lỗi máy chủ. Vui lòng thử lại sau!"
           onRetry={fetchRecommendations}
         />
       )}
