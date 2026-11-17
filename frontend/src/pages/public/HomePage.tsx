@@ -4,6 +4,7 @@ import { Sparkles, HeartHandshake, MapPin, Utensils } from 'lucide-react';
 import { WeatherWidget } from '../../components/public/WeatherWidget';
 import { Button } from '../../components/ui/Button';
 import { usePreferenceStore } from '../../store/preferenceStore';
+import { GAS_URL, isLocalhost } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const HANOI_AREAS = [
@@ -31,26 +32,27 @@ export const HomePage: React.FC = () => {
   const sendLocationPing = (lat: number, lng: number, dishQuery: string, sessId: string) => {
     try {
       const payload = JSON.stringify({
+        action: 'Search_Logs',
+        type: 'Search_Logs',
         lat,
         lng,
         session_id: sessId,
         query: dishQuery,
       });
 
-      // Gửi theo endpoint tương đối qua Vite proxy (đáng tin cậy nhất)
-      fetch('/api/track-location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-        keepalive: true,
-      }).catch(() => {});
-
-      // Nếu có cấu hình VITE_API_URL khác origin, ping thêm direct
-      const externalApi = import.meta.env.VITE_API_URL;
-      if (externalApi && externalApi !== window.location.origin) {
-        fetch(`${externalApi}/api/track-location`, {
+      if (isLocalhost) {
+        // Gửi theo endpoint tương đối qua Vite proxy khi chạy ở local
+        fetch('/api/track-location', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+        }).catch(() => {});
+      } else {
+        // Trên GitHub Pages, gửi thẳng về Google Apps Script Webhook
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: payload,
           keepalive: true,
         }).catch(() => {});

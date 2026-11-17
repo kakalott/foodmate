@@ -15,50 +15,63 @@ import type {
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-export const GAS_URL = import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
+// Gắn cứng trực tiếp đường link Google Apps Script Web App (không phụ thuộc vào .env khi build trên GitHub Actions)
+export const GAS_URL = 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
+
+export const isLocalhost = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 10000,
 });
+
+// Helper lấy thời tiết trực tiếp từ Open-Meteo hoàn toàn miễn phí, HTTPS, không cần API Key
+const fetchDirectWeather = async (lat?: number, lng?: number): Promise<WeatherData> => {
+  const latitude = lat || 21.0285;
+  const longitude = lng || 105.8542;
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+    const json = await res.json();
+    const temp = Math.round(json.current_weather?.temperature ?? 27);
+    const code = json.current_weather?.weathercode ?? 1;
+    let desc = 'Thời tiết dễ chịu';
+    if (code === 0) desc = 'Trời quang đãng, nắng nhẹ';
+    else if (code <= 3) desc = 'Trời mát mẻ, có mây rải rác';
+    else if (code >= 51 && code <= 67) desc = 'Trời có mưa nhỏ';
+    else if (code >= 80) desc = 'Trời có mưa rào';
+    return {
+      temperature: temp,
+      weather_code: code,
+      description: `${temp}°C, ${desc}`,
+      area_label: 'Khu vực của bạn',
+      observed_at: new Date().toISOString(),
+    };
+  } catch (fallbackErr) {
+    return {
+      temperature: 26,
+      weather_code: 1,
+      description: '26°C, Thời tiết mát mẻ dễ chịu',
+      area_label: 'Hà Nội',
+      observed_at: new Date().toISOString(),
+    };
+  }
+};
 
 // ─── Weather ─────────────────────────────────────────────
 export const weatherApi = {
   getCurrent: async (lat?: number, lng?: number): Promise<WeatherData> => {
+    // Nếu chạy trên GitHub Pages (không phải localhost), lấy thời tiết trực tiếp qua HTTPS ngay lập tức
+    if (!isLocalhost) {
+      return await fetchDirectWeather(lat, lng);
+    }
+
     try {
       const r = await apiClient.get<ApiResponse<WeatherData>>('/api/weather/current', { params: { lat, lng } });
       return r.data.data;
     } catch (err) {
-      // Fallback lấy thời tiết trực tiếp từ Open-Meteo hoàn toàn miễn phí & không cần API key
-      const latitude = lat || 21.0285;
-      const longitude = lng || 105.8542;
-      try {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-        const json = await res.json();
-        const temp = Math.round(json.current_weather?.temperature ?? 27);
-        const code = json.current_weather?.weathercode ?? 1;
-        let desc = 'Thời tiết dễ chịu';
-        if (code === 0) desc = 'Trời quang đãng, nắng nhẹ';
-        else if (code <= 3) desc = 'Trời mát mẻ, có mây rải rác';
-        else if (code >= 51 && code <= 67) desc = 'Trời có mưa nhỏ';
-        else if (code >= 80) desc = 'Trời có mưa rào';
-        return {
-          temperature: temp,
-          weather_code: code,
-          description: `${temp}°C, ${desc}`,
-          area_label: 'Khu vực của bạn',
-          observed_at: new Date().toISOString(),
-        };
-      } catch (fallbackErr) {
-        return {
-          temperature: 26,
-          weather_code: 1,
-          description: '26°C, Thời tiết mát mẻ dễ chịu',
-          area_label: 'Hà Nội',
-          observed_at: new Date().toISOString(),
-        };
-      }
+      return await fetchDirectWeather(lat, lng);
     }
   },
 };
@@ -69,6 +82,8 @@ export const callGasRecommendation = async (payload: RecommendationRequest): Pro
   const lat = payload.lat || 21.0285;
   const lng = payload.lng || 105.8542;
   const sessionId = payload.session_id || 'fm_sid_' + Date.now();
+
+  console.log('[FoodMate] Đang gửi yêu cầu tới Google Apps Script Web App:', GAS_URL);
 
   const res = await fetch(GAS_URL, {
     method: 'POST',
@@ -85,7 +100,13 @@ export const callGasRecommendation = async (payload: RecommendationRequest): Pro
   });
 
   const data = await res.json();
-  const dishes: string[] = data.dishes || data.recommended_dishes || ['Phở bò', 'Bún chả', 'Bánh cuốn'];
+  console.log('[FoodMate] Phản hồi từ Google Apps Script:', data);
+
+  if (!data.dishes && data.status === 'success') {
+    console.warn('[FoodMate Lưu ý] Apps Script đang chạy phiên bản cũ (chỉ ghi log chứ chưa có code Gemini AI). Hãy vào Apps Script > Deploy > New Version!');
+  }
+
+  const dishes: string[] = data.dishes || data.recommended_dishes || ['Phở bò tái lăn', 'Bún chả Hà Nội', 'Bánh cuốn nóng'];
   const places: PlaceRestaurant[] = data.places || dishes.map((dish: string, idx: number) => ({
     place_id: 'gas-dish-' + idx,
     name: dish,
@@ -111,7 +132,7 @@ export const callGasRecommendation = async (payload: RecommendationRequest): Pro
     recommended_dishes: dishes,
     places,
     google_places_results: places,
-    fun_fact: data.fun_fact || 'Hà Nội có hơn 500 biến tấu món nước khác nhau theo từng mùa thời tiết!',
+    fun_fact: data.fun_fact || 'Ẩm thực Việt Nam có sự hòa quyện tuyệt vời giữa ngũ hành và thời tiết từng mùa!',
     weather: weatherData,
   };
 };
@@ -119,15 +140,9 @@ export const callGasRecommendation = async (payload: RecommendationRequest): Pro
 // ─── Recommendations (Real-time Places Flow) ─────────────
 export const recommendationsApi = {
   get: async (payload: RecommendationRequest): Promise<RecommendationResponse> => {
-    const isGithubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
-    const preferGas = import.meta.env.VITE_USE_GAS === 'true' || isGithubPages;
-
-    if (preferGas) {
-      try {
-        return await callGasRecommendation(payload);
-      } catch (gasErr) {
-        console.warn('Call GAS failed, trying local API:', gasErr);
-      }
+    // Nếu chạy trên GitHub Pages (hoặc bất kỳ môi trường production nào), gọi thẳng Apps Script, không đợi localhost
+    if (!isLocalhost) {
+      return await callGasRecommendation(payload);
     }
 
     try {
