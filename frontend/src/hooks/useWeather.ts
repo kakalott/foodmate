@@ -1,20 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { weatherApi } from '../services/api';
-import { MOCK_WEATHER } from '../services/mockData';
+import type { WeatherData } from '../types';
 
 export const useWeather = (lat?: number, lng?: number) => {
-  return useQuery({
+  return useQuery<WeatherData>({
     queryKey: ['weather', lat, lng],
     queryFn: async () => {
-      try {
-        const res = await weatherApi.getCurrent(lat, lng);
-        if (res) return res;
-      } catch {
-        // Fallback to mock weather data
-      }
-      return MOCK_WEATHER;
+      const res = await weatherApi.getCurrent(lat, lng);
+      if (res) return res;
+      throw new Error('Không thể tải thời tiết');
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    initialData: MOCK_WEATHER,
+    staleTime: 5 * 60 * 1000, // Làm mới sau 5 phút
+    refetchOnWindowFocus: true,
   });
 };
