@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env from backend/.env or root .env
+dotenv.config({ path: path.resolve(process.cwd(), 'backend', '.env') });
+dotenv.config(); // fallback to current working directory .env
 
 import weatherRoutes from './routes/weather';
 import recommendationRoutes from './routes/recommendations';
@@ -9,8 +14,6 @@ import routingRoutes from './routes/routes';
 import configRoutes from './routes/config';
 import trackLocationRoutes from './routes/trackLocation';
 import routeFactRoutes from './routes/routeFact';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
