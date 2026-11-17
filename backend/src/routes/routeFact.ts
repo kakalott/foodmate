@@ -12,8 +12,7 @@ router.post('/', async (req: Request, res: Response) => {
     const venueName = restaurant_name || 'quán ăn';
     const dish = dish_name || textbox_value || 'món ngon';
 
-    const fact = await geminiService.generateRouteFact(venueName, dish);
-    res.json({ route_fact: fact });
+    res.json({ route_fact: `Chúc bạn ngon miệng khi thưởng thức ${dish} tại ${venueName}!` });
   } catch (error: any) {
     console.error('Error generating route fact:', error);
     res.json({ route_fact: 'Món ăn ngon nhất khi thưởng thức lúc còn nóng sốt và chia sẻ cùng bạn bè!' });
