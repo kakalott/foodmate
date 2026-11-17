@@ -71,28 +71,47 @@ function getCommentatorAdvice(dish: string, weather: WeatherData, timeStr: strin
   return `Ui tự dưng thèm **${dish}** giống bạn ghê, tầm ${timeStr} đói lòng mà làm món này thì chuẩn bài luôn! Quanh đây có mấy quán làm món này đỉnh lắm nha.`;
 }
 
-// Fallback Fun fact theo món
+// Fallback Fun fact theo món - Kho bí ẩn dị hợm, nổ não, không rập khuôn theo từ khóa món
+const DISH_MYSTERY_FALLBACKS: Record<string, string[]> = {
+  pizza: [
+    'Năm 2001, Pizza Hut từng chi hơn 1 triệu USD để đưa một chiếc pizza lên Trạm Vũ trụ Quốc tế ISS cho phi hành gia thưởng thức!',
+    'Vào thế kỷ 18 ở Napoli, pizza từng bị tầng lớp quý tộc coi là món ăn kinh tởm và bẩn thỉu chỉ dành cho dân bần cùng!',
+    'Kỷ lục chiếc pizza lớn nhất thế giới có diện tích tới 1.261 m² và hoàn toàn không chứa gluten!',
+    'Một số nhà khoa học đã chứng minh toán học: Một chiếc pizza đường kính 45cm có diện tích bề mặt lớn hơn hai chiếc pizza đường kính 30cm gộp lại!'
+  ],
+  phở: [
+    'Phi hành gia Phạm Tuân từng mang nước dùng phở đóng gói đông khô lên vũ trụ trong chuyến bay lịch sử năm 1980!',
+    'Hương thơm gây nghiện đặc trưng của phở đến từ phản ứng Maillard giữa xương bò nướng cháy cạnh và hợp chất anethole trong đại hồi quế!',
+    'Thời bao cấp từng có món "phở không người lái" — tức là bát phở hoàn toàn không có thịt nhưng người ta vẫn xếp hàng từ 4 giờ sáng để ăn nước dùng!'
+  ],
+  'bún chả': [
+    'Kỹ thuật kẹp chả bằng thanh tre tươi nướng than hoa tạo ra một lớp tinh dầu tre tự nhiên ngấm vào thịt mà vỉ sắt hiện đại không tài nào bắt chước được!',
+    'Năm 2016, cố đầu bếp lừng danh Anthony Bourdain đã chiêu đãi Tổng thống Obama món bún chả và hoá đơn huyền thoại chỉ hết vỏn vẹn 6 USD!'
+  ],
+  'bánh mì': [
+    'Bánh mì Việt Nam giòn rỗng ruột khác biệt hẳn baguette Pháp là nhờ thợ bánh thời xưa dùng lò gạch kín giữ hơi nước cực cao và pha bột gạo vào bột mì!',
+    'Năm 2011, từ "Banh mi" đã chính thức được đưa nguyên bản vào từ điển Oxford mà không cần dịch là sandwich hay baguette!'
+  ],
+  sushi: [
+    'Sushi nguyên bản hàng ngàn năm trước (Narezushi) là món cá ủ lên men chua với cơm trong cả năm trời, và người ta vứt bỏ hết cơm đi chỉ ăn cá!',
+    'Đầu bếp làm sushi truyền thống tại Nhật phải mất tới 3 năm đầu chỉ để học mỗi một việc là... vo gạo và nấu cơm sushi đạt chuẩn!'
+  ],
+  lẩu: [
+    'Tổ tiên của nồi lẩu bắt nguồn từ các chiến binh Mông Cổ thời Thành Cát Tư Hãn, họ dùng ngay mũ sắt lộn ngược làm nồi đun nước sôi giữa thảo nguyên tuyết phủ!',
+    'Tại Trùng Khánh, có một nồi lẩu khổng lồ giữ kỷ lục Guinness chứa được hàng tấn nước dùng và cùng lúc phục vụ cho 56 người ngồi ăn xung quanh!'
+  ]
+};
+
 function getDishFunFact(dish: string): string | null {
   const lower = dish.toLowerCase();
-  if (lower.includes('pizza')) {
-    return 'Bạn có biết: Pizza Margherita ban đầu được sáng tạo ở Napoli với 3 màu sắc đại diện cho quốc kỳ Ý (đỏ cà chua, trắng mozzarella, xanh húng quế)!';
+  for (const [key, facts] of Object.entries(DISH_MYSTERY_FALLBACKS)) {
+    if (lower.includes(key)) {
+      return facts[Math.floor(Math.random() * facts.length)];
+    }
   }
-  if (lower.includes('phở')) {
-    return 'Bạn có biết: Phở xuất hiện từ đầu thế kỷ 20 tại miền Bắc và được CNN nhiều lần bình chọn trong top những món nước ngon nhất thế giới!';
-  }
-  if (lower.includes('bún chả')) {
-    return 'Bạn có biết: Bún chả ngon nhất là khi chả viên được nướng bằng kẹp tre trên than hoa hồng đượm, dậy mùi thơm của hành củ nướng!';
-  }
-  if (lower.includes('bánh mì')) {
-    return 'Bạn có biết: Bánh mì Việt Nam bắt nguồn từ bánh baguette của Pháp, nhưng được biến tấu với lớp vỏ giòn rụm và ruột xốp nhẹ đặc trưng!';
-  }
-  if (lower.includes('sushi')) {
-    return 'Bạn có biết: Nguyên bản thời cổ đại, sushi là phương pháp ủ cá lên men trong cơm để bảo quản chứ không ăn tươi sống như ngày nay!';
-  }
-  if (lower.includes('lẩu')) {
-    return 'Bạn có biết: Lẩu bắt nguồn từ văn hóa ăn uống cộng đồng của người phương Đông, tượng trưng cho sự ấm cúng và sum vầy gia đình!';
-  }
-  return `Bạn có biết: ${dish} là món ăn được rất nhiều tín đồ sành ăn yêu thích nhờ hương vị đặc trưng khó quên!`;
+
+  // Nếu không khớp từ khóa cụ thể, rút ngẫu nhiên 1 sự thật bất ngờ từ kho fact ẩm thực thế giới
+  return getRandomFallbackFact();
 }
 
 // Fallback khi không có Textbox và AI offline
@@ -296,9 +315,10 @@ Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
   },
 
   async getRecommendations(req: RecommendationRequest): Promise<RecommendationResponse> {
-    const userLat = typeof req.lat === 'number' ? req.lat : 21.0285;
-    const userLng = typeof req.lng === 'number' ? req.lng : 105.8542;
-    const rawDish = (req.specific_dish || req.specificDish || '').trim();
+    const anyReq = req as any;
+    const userLat = typeof req.lat === 'number' ? req.lat : (typeof anyReq.origin_lat === 'number' ? anyReq.origin_lat : 21.0285);
+    const userLng = typeof req.lng === 'number' ? req.lng : (typeof anyReq.origin_lng === 'number' ? anyReq.origin_lng : 105.8542);
+    const rawDish = (req.specific_dish || req.specificDish || anyReq.textbox_value || anyReq.text || '').trim();
 
     // 1. Xác định thời gian thực tế
     const now = new Date();
