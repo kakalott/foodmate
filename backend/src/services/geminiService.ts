@@ -3,8 +3,60 @@ import { weatherService } from './weatherService';
 import { placesService } from './placesService';
 import { dbService } from './dataService';
 
+// Danh sách các model Flash Lite tối ưu nhất cho Free Tier
+// Tự động xoay tua để không bao giờ bị 429 hay 404
+const FLASH_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
+];
+
+async function callGeminiApi(apiKey: string, prompt: string, isJson: boolean = true): Promise<string> {
+  let lastError: any = null;
+
+  for (const model of FLASH_MODELS) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 1.0,
+              topP: 0.95,
+              ...(isJson ? { response_mime_type: 'application/json' } : {}),
+            },
+          }),
+        }
+      );
+
+      const data: any = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (rawText) {
+        return rawText;
+      }
+
+      if (data?.error) {
+        lastError = data.error;
+        console.warn(`[Gemini Flash] Model ${model} gặp lỗi:`, data.error.message);
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini Flash] Model ${model} fetch failed:`, err.message);
+    }
+  }
+
+  throw new Error(
+    `Gemini API lỗi: ${lastError?.message || 'Không có phản hồi từ máy chủ Gemini'}`
+  );
+}
+
 export const geminiService = {
-  // LUỒNG 1: Có Textbox - Đóng vai chuyên gia bí ẩn ẩm thực kỳ quái thế giới (Master Prompt: Nhiệm vụ 1 & 2)
+  // LUỒNG 1: Có Textbox - Đóng vai chuyên gia bí ẩn ẩm thực kỳ quái thế giới
   async generateCommentaryAndFact(
     searchQuery: string,
     weather: WeatherData,
@@ -34,34 +86,7 @@ Trả về đúng định dạng JSON:
 }
 `;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 1.0,
-            topP: 0.95,
-            topK: 64,
-            response_mime_type: 'application/json',
-          },
-        }),
-      }
-    );
-
-    const data: any = await res.json();
-    console.log('Gemini API response raw:', JSON.stringify(data).slice(0, 300));
-    const rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawJsonText) {
-      if (data?.error) {
-        throw new Error(`Gemini API lỗi (${data.error.code}): ${data.error.message}`);
-      }
-      throw new Error('Lỗi kết nối hoặc phản hồi không hợp lệ từ Gemini API.');
-    }
-
+    const rawJsonText = await callGeminiApi(apiKey, prompt, true);
     const parsed = JSON.parse(rawJsonText);
     const comment = parsed.comment?.trim() || `Tuyệt vời, món ${searchQuery} rất hợp lúc này!`;
     let fun_fact = parsed.fun_fact ? parsed.fun_fact.trim() : null;
@@ -87,29 +112,7 @@ Trả về đúng định dạng JSON:
 LƯU Ý QUAN TRỌNG: Tên món ăn trong mảng 'dishes' PHẢI là tên ngắn gọn (dưới 4 từ tiếng Việt, ví dụ: "Bún ốc sườn", "Cơm rang dưa bò", "Bánh tráng nướng") để hệ thống bản đồ định vị chính xác quán ăn xung quanh.
 Trả về định dạng JSON: { "comment": "Câu dạo đầu...", "dishes": ["Tên món 1", "Tên món 2", "Tên món 3"] }`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 1.0,
-            topP: 0.95,
-            response_mime_type: 'application/json',
-          },
-        }),
-      }
-    );
-
-    const data: any = await res.json();
-    const rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawJsonText) {
-      throw new Error('Lỗi kết nối từ Gemini API khi gợi ý món ngẫu nhiên.');
-    }
-
+    const rawJsonText = await callGeminiApi(apiKey, prompt, true);
     const parsed = JSON.parse(rawJsonText);
     const comment = (parsed.comment || '').trim();
     let dishes: string[] = Array.isArray(parsed.dishes) ? parsed.dishes : [];
@@ -138,28 +141,10 @@ YÊU CẦU:
 3. Độ dài: Cực kỳ ngắn gọn, sắc bén (dưới 30 từ tiếng Việt), bắt đầu bằng giọng điệu bất ngờ (VD: "Bạn có biết...", "Sự thật nổ não:...").
 Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 1.0,
-            response_mime_type: 'application/json',
-          },
-        }),
-      }
-    );
-
-    const data: any = await res.json();
-    const rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (rawJsonText) {
-      const parsed = JSON.parse(rawJsonText);
-      if (parsed.route_fact && parsed.route_fact.trim()) {
-        return parsed.route_fact.trim();
-      }
+    const rawJsonText = await callGeminiApi(apiKey, prompt, true);
+    const parsed = JSON.parse(rawJsonText);
+    if (parsed.route_fact && parsed.route_fact.trim()) {
+      return parsed.route_fact.trim();
     }
 
     throw new Error('Không thể tạo fact chỉ đường từ Gemini.');
@@ -189,7 +174,7 @@ Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
     if (rawDish) {
       finalDishes = [rawDish];
 
-      // Chạy song song: Google Places API tìm kiếm trực tiếp bằng rawDish và Gemini sinh commentary + fun fact
+      // Chạy song song: TrackAsia API tìm kiếm trực tiếp bằng rawDish và Gemini sinh commentary + fun fact
       const [placesRes, commentAndFactRes] = await Promise.all([
         placesService.searchGooglePlaces(rawDish, userLat, userLng),
         geminiService.generateCommentaryAndFact(rawDish, weather, timeStr),
@@ -208,7 +193,7 @@ Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
       commentary = aiResult.comment;
       finalDishes = aiResult.dishes;
 
-      // Bước 2: Backend xử lý ĐA LUỒNG với Promise.all gọi song song Google Places API cho từng món
+      // Bước 2: Backend xử lý ĐA LUỒNG với Promise.all gọi song song TrackAsia cho từng món
       const placePromises = finalDishes.map((dish) =>
         placesService.searchGooglePlaces(dish, userLat, userLng)
       );
@@ -219,7 +204,7 @@ Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
       const seenIds = new Set<string>();
 
       placesArrays.forEach((arr) => {
-        const topOfDish = arr.slice(0, 4);
+        const topOfDish = arr.slice(0, 3);
         for (const p of topOfDish) {
           if (!seenIds.has(p.place_id)) {
             seenIds.add(p.place_id);
@@ -228,9 +213,9 @@ Trả về định dạng JSON duy nhất: { "route_fact": "..." }`;
         }
       });
 
-      // Sắp xếp ưu tiên quán có rating cao
-      mergedPlaces.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      places = mergedPlaces;
+      // Sắp xếp ưu tiên quán gần nhất
+      mergedPlaces.sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+      places = mergedPlaces.slice(0, 6);
     }
 
     // 5. Ghi log tìm kiếm & Tự động lưu tọa độ xuất phát của người dùng (Bản đồ User)
