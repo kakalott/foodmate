@@ -114,7 +114,7 @@ function getDefaultDishes(weather: WeatherData, timeStr: string): { comment: str
 }
 
 export const geminiService = {
-  // LUỒNG 1: Có Textbox - Đóng vai người bạn sành ăn, kèm Fun Fact nếu là món ăn
+  // LUỒNG 1: Có Textbox - Đóng vai chuyên gia bí ẩn ẩm thực kỳ quái thế giới (Master Prompt: Nhiệm vụ 1 & 2)
   async generateCommentaryAndFact(
     searchQuery: string,
     weather: WeatherData,
@@ -125,11 +125,24 @@ export const geminiService = {
     if (apiKey) {
       try {
         const weatherDesc = `${weather.temperature}°C, ${weather.description}`;
-        const prompt = `Đóng vai người bạn sành ăn. User muốn ăn '${searchQuery}' lúc ${timeStr}, thời tiết ${weatherDesc}. Hãy bình luận 1 câu vui vẻ, dí dỏm tán thành lựa chọn này.
-ĐỒNG THỜI: Nếu '${searchQuery}' là một món ăn, hãy chọn ngẫu nhiên 1 chủ đề (Nguồn gốc lịch sử, Dinh dưỡng, Sự thật thú vị) và viết 1 fact cực ngắn (dưới 30 chữ) bắt đầu bằng 'Bạn có biết:'. Nếu không phải món ăn, để fun_fact là null.
-Trả về định dạng JSON: { "comment": "Câu bình luận...", "fun_fact": "Bạn có biết: ... hoặc null" }`;
+        const prompt = `
+Bối cảnh: Người dùng muốn ăn món '${searchQuery}', lúc này là ${timeStr}, thời tiết đang ${weatherDesc}.
+Nhiệm vụ 1: Đóng vai người bạn dí dỏm, bình luận 1 câu thật tự nhiên (dưới 20 chữ) để tán thành lựa chọn này.
+Nhiệm vụ 2: Đóng vai một chuyên gia săn lùng những bí ẩn ẩm thực kỳ quái nhất thế giới. Nếu '${searchQuery}' là một món ăn hoặc nguyên liệu hợp lệ, hãy tìm ra 1 sự thật "nổ não", kỳ cục, hoặc cực kỳ hiếm người biết về nó (dưới 40 chữ). 
 
-        console.log('Payload to Gemini (Commentary & Fact Mode - Có Textbox):\n', prompt);
+Yêu cầu BẮT BUỘC cho Nhiệm vụ 2:
+- TUYỆT ĐỐI KHÔNG dùng kiến thức đại trà (ví dụ cấm nói: pizza xuất xứ từ Ý, cà rốt sáng mắt, trà sữa nhiều đường...).
+- Hãy tự động random ngẫu nhiên 1 trong vô vàn góc độ sau để không bao giờ lặp lại: một tai nạn lịch sử tạo ra món đó, một định luật hóa học kỳ lạ khi nấu, một quốc gia từng bỏ tù người ăn món này, hoặc một kỷ lục Guinness điên rồ.
+- Nếu '${searchQuery}' không phải đồ ăn, trả về fun_fact là null.
+
+Trả về đúng định dạng JSON:
+{
+  "comment": "Câu bình luận ở nhiệm vụ 1",
+  "fun_fact": "💡 Bạn có biết: [Sự thật nổ não ở nhiệm vụ 2]"
+}
+`;
+
+        console.log('Payload to Gemini (Commentary & Fact Mode - Master Prompt Có Textbox):\n', prompt);
 
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -139,7 +152,9 @@ Trả về định dạng JSON: { "comment": "Câu bình luận...", "fun_fact":
             body: JSON.stringify({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
               generationConfig: {
-                temperature: 0.95,
+                temperature: 1.0, // Mức cao nhất để tạo tính ngẫu nhiên, chống rập khuôn
+                topP: 0.95,       // Mở rộng vốn từ vựng và ý tưởng được phép sử dụng
+                topK: 64,
                 response_mime_type: 'application/json',
               },
             }),
@@ -153,7 +168,10 @@ Trả về định dạng JSON: { "comment": "Câu bình luận...", "fun_fact":
         if (rawJsonText) {
           const parsed = JSON.parse(rawJsonText);
           const comment = parsed.comment?.trim() || getCommentatorAdvice(searchQuery, weather, timeStr);
-          const fun_fact = parsed.fun_fact ? parsed.fun_fact.trim() : null;
+          let fun_fact = parsed.fun_fact ? parsed.fun_fact.trim() : null;
+          if (fun_fact && !fun_fact.startsWith('💡')) {
+            fun_fact = `💡 ${fun_fact}`;
+          }
           return { comment, fun_fact };
         }
       } catch (err) {
