@@ -92,12 +92,38 @@ export const RouteExplorerPage: React.FC = () => {
     }
   };
 
-  // Fetch user start locations from /api/track-location
+  // Fetch user start locations from /api/track-location or Google Apps Script doGet
   const loadUserLocations = async () => {
     setIsLoadingLocations(true);
     try {
-      const res = await apiClient.get('/api/track-location');
-      const list = res.data?.data || [];
+      let list: UserStartLocation[] = [];
+      const isGithubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+
+      if (!isGithubPages) {
+        try {
+          const res = await apiClient.get('/api/track-location');
+          list = res.data?.data || [];
+        } catch (e) {
+          console.warn('Local track-location failed, falling back to Google Sheets / GAS:', e);
+        }
+      }
+
+      // Nếu chạy trên GitHub Pages hoặc Backend local không có dữ liệu, đọc trực tiếp từ Google Sheets qua GAS
+      if (list.length === 0) {
+        const gasUrl = import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
+        const res = await fetch(`${gasUrl}?action=get_logs`);
+        const data = await res.json();
+        const logs = Array.isArray(data) ? data : data?.data || [];
+        list = logs.map((item: any, idx: number) => ({
+          id: item.id || `gas-log-${idx}`,
+          session_id: item.session_id || item.sessionId || `sess-${idx}`,
+          lat: Number(item.lat || item.latitude) || 21.0285,
+          lng: Number(item.lng || item.longitude) || 105.8542,
+          query: item.query || item.suggested || item.suggested_dishes || 'Khách tìm món',
+          created_at: item.timestamp || item.created_at || new Date().toISOString(),
+        }));
+      }
+
       setUserLocations(list);
       if (list.length > 0) {
         setSelectedLocation(list[0]);

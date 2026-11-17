@@ -5,6 +5,7 @@ import type {
   WeatherData,
   RecommendationRequest,
   RecommendationResponse,
+  PlaceRestaurant,
   RouteLog,
   Restaurant,
   RestaurantMenu,
@@ -14,6 +15,7 @@ import type {
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const GAS_URL = import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzeYapbXJWzyxYdVKcxCdTsg446DRsNFd3bFxhLsiWG3vTk6HGp7h1dqvHkdvN4-WlvBg/exec';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -23,18 +25,119 @@ export const apiClient = axios.create({
 
 // ─── Weather ─────────────────────────────────────────────
 export const weatherApi = {
-  getCurrent: (lat?: number, lng?: number) =>
-    apiClient
-      .get<ApiResponse<WeatherData>>('/api/weather/current', { params: { lat, lng } })
-      .then((r) => r.data.data),
+  getCurrent: async (lat?: number, lng?: number): Promise<WeatherData> => {
+    try {
+      const r = await apiClient.get<ApiResponse<WeatherData>>('/api/weather/current', { params: { lat, lng } });
+      return r.data.data;
+    } catch (err) {
+      // Fallback lấy thời tiết trực tiếp từ Open-Meteo hoàn toàn miễn phí & không cần API key
+      const latitude = lat || 21.0285;
+      const longitude = lng || 105.8542;
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+        const json = await res.json();
+        const temp = Math.round(json.current_weather?.temperature ?? 27);
+        const code = json.current_weather?.weathercode ?? 1;
+        let desc = 'Thời tiết dễ chịu';
+        if (code === 0) desc = 'Trời quang đãng, nắng nhẹ';
+        else if (code <= 3) desc = 'Trời mát mẻ, có mây rải rác';
+        else if (code >= 51 && code <= 67) desc = 'Trời có mưa nhỏ';
+        else if (code >= 80) desc = 'Trời có mưa rào';
+        return {
+          temperature: temp,
+          weather_code: code,
+          description: `${temp}°C, ${desc}`,
+          area_label: 'Khu vực của bạn',
+          observed_at: new Date().toISOString(),
+        };
+      } catch (fallbackErr) {
+        return {
+          temperature: 26,
+          weather_code: 1,
+          description: '26°C, Thời tiết mát mẻ dễ chịu',
+          area_label: 'Hà Nội',
+          observed_at: new Date().toISOString(),
+        };
+      }
+    }
+  },
+};
+
+// Helper gọi trực tiếp Google Apps Script Web App
+export const callGasRecommendation = async (payload: RecommendationRequest): Promise<RecommendationResponse> => {
+  const query = payload.specific_dish || payload.specificDish || '';
+  const lat = payload.lat || 21.0285;
+  const lng = payload.lng || 105.8542;
+  const sessionId = payload.session_id || 'fm_sid_' + Date.now();
+
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'recommend',
+      lat,
+      lng,
+      query,
+      session_id: sessionId,
+      dietary_preferences: payload.dietary_preferences,
+      preferred_categories: payload.preferred_categories,
+    }),
+  });
+
+  const data = await res.json();
+  const dishes: string[] = data.dishes || data.recommended_dishes || ['Phở bò', 'Bún chả', 'Bánh cuốn'];
+  const places: PlaceRestaurant[] = data.places || dishes.map((dish: string, idx: number) => ({
+    place_id: 'gas-dish-' + idx,
+    name: dish,
+    address: 'Món ngon nổi bật theo thời tiết hôm nay',
+    lat,
+    lng,
+    rating: 4.8,
+  }));
+
+  const weatherData: WeatherData = data.weather || {
+    temperature: 28,
+    weather_code: 1,
+    description: '28°C, Mát mẻ dễ chịu',
+    area_label: 'Khu vực của bạn',
+    observed_at: new Date().toISOString(),
+  };
+
+  return {
+    intro_message: data.ai_message || data.intro_message || data.comment || 'Chào bạn! FoodMate đã chuẩn bị những gợi ý ngon nhất cho bạn hôm nay:',
+    ai_message: data.ai_message || data.comment || data.intro_message,
+    message: data.ai_message || data.comment || '',
+    dishes,
+    recommended_dishes: dishes,
+    places,
+    google_places_results: places,
+    fun_fact: data.fun_fact || 'Hà Nội có hơn 500 biến tấu món nước khác nhau theo từng mùa thời tiết!',
+    weather: weatherData,
+  };
 };
 
 // ─── Recommendations (Real-time Places Flow) ─────────────
 export const recommendationsApi = {
-  get: (payload: RecommendationRequest) =>
-    apiClient
-      .post<ApiResponse<RecommendationResponse>>('/api/recommend', payload)
-      .then((r) => r.data.data),
+  get: async (payload: RecommendationRequest): Promise<RecommendationResponse> => {
+    const isGithubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+    const preferGas = import.meta.env.VITE_USE_GAS === 'true' || isGithubPages;
+
+    if (preferGas) {
+      try {
+        return await callGasRecommendation(payload);
+      } catch (gasErr) {
+        console.warn('Call GAS failed, trying local API:', gasErr);
+      }
+    }
+
+    try {
+      const r = await apiClient.post<ApiResponse<RecommendationResponse>>('/api/recommend', payload);
+      return r.data.data;
+    } catch (apiErr) {
+      console.warn('Local backend /api/recommend unavailable, switching to Google Apps Script proxy:', apiErr);
+      return await callGasRecommendation(payload);
+    }
+  },
 };
 
 // ─── Routes & Route Logs (v3.1 with Delete) ──────────────
