@@ -14,53 +14,83 @@ function calculateHaversineKm(lat1: number, lon1: number, lat2: number, lon2: nu
 }
 
 export const placesService = {
-  // Tìm kiếm quán ăn thực tế qua TrackAsia Search API (Focus vào tọa độ user)
+  // Tìm kiếm quán ăn thực tế qua TrackAsia Search API với 2 Lớp Khiên Bảo Vệ
   async searchTrackAsiaPlaces(
-    query: string,
-    userLat: number,
-    userLng: number
+    keyword: string,
+    lat: number,
+    lng: number
   ): Promise<PlaceRestaurant[]> {
     const apiKey = await dbService.getEffectiveApiKey('trackasia');
-    const searchKeyword = query.trim();
 
     if (!apiKey) {
       throw new Error('Chưa cấu hình TRACKASIA_API_KEY trên máy chủ.');
     }
 
-    // API Search của TrackAsia chuẩn GeoJSON: trả về features[] với geometry.coordinates là [lon, lat]
+    // 1. LỚP KHIÊN TEXT: Tự động thêm chữ "quán" để ép bộ máy tìm kiếm hiểu đúng ý định ẩm thực
+    const cleanKeyword = keyword.trim();
+    const lowerKeyword = cleanKeyword.toLowerCase();
+    const isAlreadySpecific =
+      lowerKeyword.includes('quán') ||
+      lowerKeyword.includes('nhà hàng') ||
+      lowerKeyword.includes('tiệm') ||
+      lowerKeyword.includes('bếp') ||
+      lowerKeyword.includes('cửa hàng');
+    const searchQuery = isAlreadySpecific ? cleanKeyword : `quán ${cleanKeyword}`;
+
+    // 2. LỚP KHIÊN API:
+    // - size=6: Khóa chặt kết quả
+    // - layers=venue: Loại bỏ đường xá, thành phố, chỉ quét POI/địa điểm kinh doanh
     const url = `https://maps.track-asia.com/api/v1/search?text=${encodeURIComponent(
-      searchKeyword
-    )}&focus.point.lat=${userLat}&focus.point.lon=${userLng}&size=10&key=${apiKey}`;
+      searchQuery
+    )}&focus.point.lat=${lat}&focus.point.lon=${lng}&size=6&layers=venue&key=${apiKey}&api_key=${apiKey}`;
 
-    const res = await fetch(url);
-    const data: any = await res.json();
+    try {
+      const response = await fetch(url);
+      const data: any = await response.json();
 
-    if (Array.isArray(data.features)) {
+      if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
+        return [];
+      }
+
+      // Chuẩn hóa dữ liệu trả về và tính khoảng cách
       const places: PlaceRestaurant[] = data.features.map((feature: any, idx: number) => {
-        const coords = feature.geometry?.coordinates || [userLng, userLat];
+        const coords = feature.geometry?.coordinates || [lng, lat];
         const pLng = coords[0];
         const pLat = coords[1];
-        const dist = calculateHaversineKm(userLat, userLng, pLat, pLng);
+
+        // Ưu tiên khoảng cách thực tế do TrackAsia tính (nếu có, đổi sang km), nếu không tính bằng Haversine
+        let distanceKm: number;
+        if (typeof feature.properties?.distance === 'number') {
+          distanceKm = Math.round(feature.properties.distance * 10) / 10;
+        } else {
+          distanceKm = calculateHaversineKm(lat, lng, pLat, pLng);
+        }
 
         return {
           place_id: feature.properties?.id || `trackasia_${idx}_${pLat}_${pLng}`,
-          name: feature.properties?.name || searchKeyword,
+          name: feature.properties?.name || cleanKeyword,
           address: feature.properties?.label || feature.properties?.street || 'Hà Nội',
           lat: pLat,
           lng: pLng,
           rating: 4.8,
           user_ratings_total: 100,
-          distance_km: dist,
-          dish_matched: searchKeyword,
+          distance_km: distanceKm,
+          dish_matched: cleanKeyword,
         };
       });
 
-      // Sắp xếp ưu tiên quán gần người dùng nhất
-      places.sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
-      return places;
-    }
+      // Lọc bỏ kết quả trùng tên hoặc không phải quán ăn nếu có từ "game"
+      const filtered = places.filter(
+        (p) => !p.name.toLowerCase().includes('game') && !p.name.toLowerCase().includes('nét')
+      );
 
-    return [];
+      // Sắp xếp ưu tiên quán gần nhất và lấy tối đa chính xác 6 quán
+      filtered.sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+      return filtered.slice(0, 6);
+    } catch (error: any) {
+      console.error('Lỗi gọi API TrackAsia Search:', error);
+      throw new Error('Lỗi máy chủ bản đồ');
+    }
   },
 
   // Alias tương thích ngược cho recommendations flow
